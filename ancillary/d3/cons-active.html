@@ -1,0 +1,125 @@
+<meta charset="utf-8">
+
+<style>
+body {
+  font: 10px sans-serif;
+}
+
+.tooltip {
+  position: absolute;
+  opacity:0.8;
+  z-index:1000;
+  text-align:left;
+  border-radius:4px;
+  padding:8px;
+  color:#fff;
+  background-color:#000;
+  font: 12px sans-serif;
+  max-width: 300px;
+}
+</style>
+
+
+
+<body>
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+<div id="snake"></div>
+<script>
+
+  var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+  //==============================================================================
+
+//var r = ['#fa9fb5', '#dd3497', '#7a0177'];
+//var r = ['#443a83','#2c728e','#75d054','#fde725'];
+var r = ['#a92395','#de5f65','#fca338','#f0f921'];
+var active_color = d3.scaleOrdinal()
+                     .domain([1,2,3,4])
+                     .range(r);
+
+  function fill_snake(active_data) {
+    var snake = d3.select("#snake");
+    var circ = snake.selectAll("circle");
+    // see: https://stackoverflow.com/a/14150354 for key function
+    circ
+        .data(active_data, function(d) { return (d && d.id) || d3.select(this).attr("id"); })
+        .style('fill', d => active_color(d.n))
+        .on("mouseover", function(d) {
+          d3.select(this).style("fill","white");
+          var this_id = d3.select(this).attr("id").replace(/_/,"");
+          d3.selectAll(".dot")
+                 .transition()
+                 .duration(150)
+          tooltip.transition()
+                 .duration(150)
+                 .style("opacity", .9);
+          tooltip.html(d3.select(this).attr("original_title"))
+                 .style("left", (d3.event.pageX + 5) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+        })
+        .on("mouseout", function(d) {
+            d3.select(this).style("fill",d => active_color(d.n))
+          tooltip.transition()
+                 .duration(300)
+                 .style("opacity", 0);
+        });
+
+    var text = snake.selectAll("text");
+    text
+        .data(active_data, function(d) { return (d && d.id) || d3.select(this).attr("id"); })
+        .on("mouseover", function(d) {
+          var this_id = d3.select(this).attr("id");
+          circ.filter("#"+this_id)
+              .style("fill", "white");
+          tooltip.transition()
+                 .duration(150)
+                 .style("opacity", .9);
+          tooltip.html(d3.select(this).attr("original_title"))
+                 .style("left", (d3.event.pageX + 5) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+    })
+        .on("mouseout", function(d) {
+        circ.filter("#"+d3.select(this).attr("id"))
+                .style("fill",d => active_color(d.n))
+    });
+  };
+
+  //==============================================================================
+  function readSVG(path) {
+        return d3.xml(path, "image/svg+xml");
+    }
+
+  d3.queue()
+    .defer(d3.csv, "inactive.csv")
+    .defer(d3.xml, "adrb2.svg")
+    .await(ready);
+
+  function ready(error, active, snake) {
+    if (error) {
+      console.error('Yikes' + error);
+    } else {
+
+      //setup snakeplot svg
+      var importedNode = document.importNode(snake.documentElement, true);
+      d3.select("#snake")
+            .each(function () {
+                this.appendChild(importedNode);
+            });
+
+      // cast data
+      active.forEach(d => {
+        d.n = +d.n
+      })
+
+      // start at position
+      fill_snake(active);
+    }
+  };
+
+</script>
+
+

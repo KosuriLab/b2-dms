@@ -1,0 +1,5 @@
+The alignment fasta of all Class A GPCR's has some issues that need to be taken care of (as of 2019/02/11).
+
+1) There is a duplicate record of `>fpr2_human`
+2) The `_` are incompatible with our conservation scoring algo. Use sed to replace with `-`.
+3) Deletion of the consensus sequence

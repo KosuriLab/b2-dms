@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-gap: 10px;
+  padding: 10px;
+}
+.grid-container > div {
+  text-align: center;
+  padding: 20px 0;
+  font-size: 30px;
+}
+.item1 {
+  grid-row: 1 / 3;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+}
+
+.line {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3;
+}
+
+.dot {
+  stroke: #000;
+}
+
+.tooltip {
+  position: absolute;
+  opacity:0.8;
+  z-index:1000;
+  text-align:left;
+  border-radius:4px;
+  padding:8px;
+  color:#fff;
+  background-color:#000;
+  font: 12px sans-serif;
+  max-width: 300px;
+}
+
+</style>
+
+<div class="grid-container">
+    <div class="item1" id="snake"></div>
+    <div class="item2" id="scatter"></div>
+    <div class="item4" id='induction'></div>
+</div>
+
+
+<body>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+
+<script>
+
+  //==============================================================================
+  // Set scales, axes, and colors
+
+  var margin = {top: 20, right: 20, bottom: 20, left: 50},
+      scatter_width = 400 - margin.left - margin.right,
+      scatter_height = 500 - margin.top - margin.bottom,
+      scatter_x = d3.scaleLinear().range([0, scatter_width]),
+      scatter_y = d3.scaleLinear().range([scatter_height - 100, 0]);
+
+  var scatter_color = d3.scaleSequential(d3.interpolateViridis);
+
+  var scatter = d3.select("#scatter").append("svg")
+      .attr("width", scatter_width + margin.left + margin.right)
+      .attr("height", scatter_height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  //-----------------------------------------------------------------------------
+  // induction graph specifics
+
+  var induction_width = 600 - margin.left - margin.right,
+      induction_height = 400 - margin.top - margin.bottom,
+      induction_x = d3.scaleLinear()
+                      .range([0, induction_width - 200]),
+      induction_y = d3.scaleLinear()
+                      .range([induction_height, 0]);
+
+  var induction_color = d3.scaleOrdinal(d3.schemeCategory10);
+
+  var induction = d3.select("#induction").append("svg")
+      .attr("width", induction_width + margin.left + margin.right)
+      .attr("height", induction_height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  //-----------------------------------------------------------------------------
+
+  var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+  //==============================================================================
+  // snakeplot
+  function fill_snake(induction_data) {
+    var snake = d3.select("#snake");
+    var circ = snake.selectAll("circle");
+
+    circ
+        .on("mouseover", function(d) {
+          d3.select(this).style("fill","red");
+          var this_id = d3.select(this).attr("id").replace(/_/,"");
+          update_induction(induction_data, +this_id);
+          tooltip.transition()
+                 .duration(150)
+                 .style("opacity", .9);
+          tooltip.html(d3.select(this).attr("original_title"))
+                 .style("left", (d3.event.pageX + 5) + "px")
+                 .style("top", (d3.event.pageY - 28) + "px");
+        })
+        .on("mouseout", function(d) {
+          //console.log(d3.select(this).attr("fill"))
+          d3.select(this).style("fill","white")
+          tooltip.transition()
+                 .duration(300)
+                 .style("opacity", 0);
+        });
+
+    var text = snake.selectAll("text");
+    text.on("mouseover", function(d) {
+        var this_id = d3.select(this).attr("id");
+        circ.filter("#"+this_id)
+            .style("fill", "red");
+        update_induction(induction_data, +this_id.replace(/_/,""));
+        tooltip.transition()
+               .duration(150)
+               .style("opacity", .9);
+        tooltip.html(d3.select(this).attr("original_title"))
+               .style("left", (d3.event.pageX + 5) + "px")
+               .style("top", (d3.event.pageY - 28) + "px");
+    })
+        .on("mouseout", function(d) {
+        circ.filter("#"+d3.select(this).attr("id"))
+            .style("fill", "white")
+    });
+
+  }
+
+  //==============================================================================
+  // brush helpers
+
+  function highlightBrushedCircles() {
+    if (d3.event.selection != null) {
+      // revert circles to initial style assumes DOTS exist
+      var scatter_points = d3.selectAll(".dot");
+      scatter_points.attr("r", 3.5)
+        .style("fill", (d) => scatter_color(+d.Pos));
+      var brush_coords = d3.brushSelection(this);
+
+      // style brushed circles
+      scatter_points.filter(function (){
+        var cx = d3.select(this).attr("cx"),
+            cy = d3.select(this).attr("cy");
+        return isBrushed(brush_coords, cx, cy);
+       })
+        .attr("r", 7)
+        .style("fill", "black");
+
+      // extract data to style snakeplot
+      var filter_data = scatter_points.filter(function (){
+        var cx = d3.select(this).attr("cx"),
+            cy = d3.select(this).attr("cy");
+        return isBrushed(brush_coords, cx, cy);
+      }).data()
+      console.log(filter_data);
+
+      // join and style snake (assumes snake exists!!)
+      // see: https://stackoverflow.com/a/14150354 for key function
+      var circ = d3.select("#snake")
+        .selectAll("circle");
+      circ.data(filter_data, d => d ? "_" + d.Pos : this.id)
+        .style("fill", "blue");
+
+    }
+  }
+
+  function isBrushed(brush_coords, cx, cy) {
+    var x0 = brush_coords[0][0],
+        x1 = brush_coords[1][0],
+        y0 = brush_coords[0][1],
+        y1 = brush_coords[1][1];
+    return x0 <= cx && cx <= x1 && y0 <= cy && cy <= y1;
+  }
+
+  //==============================================================================
+  // scatter plot
+
+  function scatter_plot(data, induction_data) {
+    scatter_x.domain(d3.extent(data, d => d.X)).nice();
+    scatter_y.domain(d3.extent(data, d => d.Y)).nice();
+    //color.domain(d3.extent(data, d => d.Pos )).nice();
+    scatter_color.domain([1, 413]);
+
+    scatter.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + (scatter_height -100) + ")")
+        .call(d3.axisBottom(scatter_x))
+        .append("text")
+        .attr("class", "label")
+        .attr("x", scatter_width)
+        .attr("y", -6)
+        .style("text-anchor", "end")
+        .text("Sepal Width (cm)");
+
+    scatter.append("g")
+        .attr("class", "y axis")
+        .call(d3.axisLeft(scatter_y))
+        .append("text")
+        .attr("class", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Sepal Length (cm)");
+
+    scatter.selectAll(".dot")
+        .data(data)
+        .enter().append("circle")
+        .attr("class", "dot")
+        .attr("r", 3.5)
+        .attr("cx", d => scatter_x(d.X))
+        .attr("cy", d => scatter_y(d.Y))
+        .style("fill", d => scatter_color(d.Pos));
+
+    scatter.append("g")
+      .attr("class", "legendLinear")
+      .attr("transform", "translate(0,380)");
+
+    var legendLinear = d3.legendColor()
+      .shapeWidth(26)
+      .cells(12)
+      .labelFormat(d3.format(",.0f"))
+      .orient('horizontal')
+      .scale(scatter_color);
+
+    scatter.select(".legendLinear")
+      .call(legendLinear);
+
+    var brush = d3.brush()
+                  .on("brush", highlightBrushedCircles);
+
+    scatter.append("g")
+           .call(brush)
+  };
+
+  //==============================================================================
+
+  function induction_plot(data) {
+
+    // EXTERNAL STATE!! ASSUMES x and y HAVE BEEN SET ALREADY!
+    induction_x.domain(d3.extent(data, d => d.Condition)).nice();
+    // induction_y.domain(d3.extent(data, d => d.Norm)).nice();
+    induction_y.domain([0, 2])
+    var line = d3.line()
+                 .x(d => induction_x(d.Condition))
+                 .y(d => induction_y(d.Norm));
+
+
+    // group_by Class and loop through to plot
+    var groupby = d3.nest()
+        .key(d => d.Class)
+        .entries(data);
+
+    groupby.forEach(function(d,i) {
+      induction.append("path")
+        .attr("class", "line")
+        .style("stroke", function() { // Add the colors dynamically
+            return d.color = induction_color(d.key); })
+        .attr("id", "tag"+d.key.replace(/\s+/g, "")) // assign an ID
+        .attr("d", line(d.values));
+    });
+
+  // generate the plots
+  induction.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + induction_height + ")")
+      .call(d3.axisBottom(induction_x))
+      .append("text")
+      .attr("class", "label")
+      .attr("x", induction_width)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .text("Sepal Width (cm)");
+
+  induction.append("g")
+      .attr("class", "y axis")
+      .call(d3.axisLeft(induction_y))
+      .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Sepal Length (cm)");
+
+  induction.selectAll(".dot")
+      .data(data)
+      .enter().append("circle")
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", d => induction_x(d.Condition))
+      .attr("cy", d => induction_y(d.Norm))
+      .style("fill", d => induction_color(d.Class));
+
+  induction.append("g")
+      .attr("class", "legendCat")
+      .attr("transform", "translate(410,0)");
+
+  var legendCat = d3.legendColor()
+      .shapeWidth(26)
+      .cells(12)
+      .orient('vertical')
+      .scale(induction_color);
+
+  induction.select(".legendCat")
+      .call(legendCat);
+}
+
+
+  //==============================================================================
+  // Update the induction graph on a mouseover event
+
+  function update_induction(data, pos) {
+    var re_filter = data.filter(d => d.Pos == pos);
+    induction.selectAll("*").remove();
+    induction_plot(re_filter)
+  }
+
+  //==============================================================================
+    function readSVG(path) {
+        return d3.xml(path, "image/svg+xml");
+    }
+
+  d3.queue()
+    .defer(d3.csv, "tsne.csv")
+    .defer(d3.csv, "by-class.csv")
+    .defer(d3.xml, "adrb2.svg")
+    .await(ready);
+
+  function ready(error, tsne, byClass, snake) {
+    if (error) {
+      console.error('Yikes' + error);
+    } else {
+
+      //setup snakeplot svg
+      var importedNode = document.importNode(snake.documentElement, true);
+      d3.select("#snake")
+            .each(function () {
+                this.appendChild(importedNode);
+            });
+
+      // cast data
+      tsne.forEach(d => {
+        d.X = +d.X
+        d.Y = +d.Y
+        d.Pos = +d.Pos
+      })
+
+      byClass.forEach(d => {
+        d.Condition = +d.Condition
+        d.Pos = +d.Pos
+        d.Norm = +d.Norm
+      })
+
+      // start at position
+      induction_plot(byClass.filter(d => d.Pos == 2));
+
+      scatter_plot(tsne, byClass);
+      fill_snake(byClass);
+    }
+  };
+
+
+</script>
+</body>

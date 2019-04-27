@@ -1,0 +1,5 @@
+Index Condition Repeat
+TCGCCTTA F_5 1
+CTAGTACG F_5 2
+TTCTGCCT 5 1
+GCTCAGGA 5 2

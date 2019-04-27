@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style type="text/css">
+/* 13. Basic Styling with CSS */
+
+/* Style the lines by removing the fill and applying a stroke */
+.line {
+    fill: none;
+    stroke: #ffab00;
+    stroke-width: 3;
+}
+
+/* Style the dots by assigning a fill and stroke */
+.dot {
+    fill: #ffab00;
+    stroke: #fff;
+}
+
+</style>
+<!-- Body tag is where we will append our SVG and SVG objects-->
+<body>
+</body>
+
+<!-- Load in the d3 library -->
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<script>
+
+//-------------------------------------------------------------------------------
+// Define Line
+
+var line = d3.line()
+    .x(function(d) { return x(d.Condition); })
+    .y(function(d) { return y(d.Norm); });
+
+
+//-------------------------------------------------------------------------------
+// Set scales, axes, and colors
+
+var margin = {top: 50, right: 50, bottom: 50, left: 50}
+  , width = window.innerWidth - margin.left - margin.right // Use the window's width
+  , height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+
+var x = d3.scaleLinear()
+    .range([0, width]);
+
+var y = d3.scaleLinear()
+    .range([height, 0]);
+
+var color = d3.scaleOrdinal(d3.schemeCategory10);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+//-------------------------------------------------------------------------------
+// Data loading is async so either include all of the plot in the funciton or roll your own
+
+d3.csv("test.csv", function(error, data) {
+  if (error) throw error;
+  console.log(data)
+
+  data.forEach(function(d) {
+    Condition: +d.Condition;
+    Pos: +d.Pos;
+    Class: d.Class;
+    Norm: +d.Norm;
+  });
+
+  x.domain(d3.extent(data, function(d) { return d.Condition; })).nice();
+  y.domain(d3.extent(data, function(d) { return d.Norm; })).nice();
+
+  // group_by Class and loop through to plot
+  var groupby = d3.nest()
+      .key(function(d) {return d.Class;})
+      .entries(data);
+  
+  groupby.forEach(function(d,i) {
+            svg.append("path")
+            .attr("class", "line")
+            .style("stroke", function() { // Add the colours dynamically
+                return d.color = color(d.key); })
+            .attr("id", 'tag'+d.key.replace(/\s+/g, '')) // assign an ID
+            .attr("d", line(d.values));
+  });
+   
+  // generate the plots
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x))
+    .append("text")
+      .attr("class", "label")
+      .attr("x", width)
+      .attr("y", -6)
+      .style("text-anchor", "end")
+      .text("Sepal Width (cm)");
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(d3.axisLeft(y))
+    .append("text")
+      .attr("class", "label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Sepal Length (cm)")
+
+  svg.selectAll(".dot")
+      .data(data)
+    .enter().append("circle")
+      .attr("class", "dot")
+      .attr("r", 3.5)
+      .attr("cx", function(d) { return x(d.Condition); })
+      .attr("cy", function(d) { return y(d.Norm); })
+      .style("fill", function(d) { return color(d.Class); });
+
+  var legend = svg.selectAll(".legend")
+      .data(color.domain())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+  legend.append("rect")
+      .attr("x", width - 18)
+      .attr("width", 18)
+      .attr("height", 18)
+      .style("fill", color);
+
+  legend.append("text")
+      .attr("x", width - 24)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .style("text-anchor", "end")
+      .text(function(d) { return d; });
+
+});
+
+</script>
+
+
