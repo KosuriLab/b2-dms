@@ -33,7 +33,7 @@ The processed data can be analyzed on any standard laptop with at least 16 GB of
 The docker image relies on the [Rocker Project](https://www.rocker-project.org/) to provide RStudio. To link this repository to the docker image run
 
 ```bash
-docker run -d  -e PASSWORD=yourpassword -p 8787:8787 -p 8888:8888 -v /path/to/b2-dms:/home/rstudio/b2-dms b2-dms
+docker run -d  -e PASSWORD=yourpassword -p 8787:8787 -p 8888:8888 -v /path/to/b2-dms:/home/rstudio/b2-dms nlubock/b2-dms
 ```
 
 Then point your browser to `localhost:8787` and use `rstudio` and `yourpassword` to log in
