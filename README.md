@@ -19,7 +19,7 @@ docker pull nlubock/b2-dms
 Or build it from scratch
 
 ```bash
-docker build -t b2-dms docker/Dockerfile
+docker build -t b2-dms ./docker
 ```
 
 ## Requirements
